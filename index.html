@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Hiragana Quiz — All Kana Missing (Words)</title>
+<style>
+  body {
+    font-family: "Hiragino Kaku Gothic Pro", "Meiryo", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 36px;
+    color: #333;
+    background: #f7f7f8;
+  }
+
+  h1 {
+    color: #b23b3b;
+    font-size: 1.9rem;
+    margin-bottom: 12px;
+  }
+
+  #game-container {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    padding: 22px;
+    width: 94%;
+    max-width: 920px;
+    text-align: center;
+  }
+
+  .word-container {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+    margin-bottom: 18px;
+  }
+
+  .letter-box {
+    width: 64px;
+    height: 84px;
+    border: 3px solid #111;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 4px;
+    background: #fff;
+    box-sizing: border-box;
+  }
+
+  .romaji {
+    font-size: 0.75rem;
+    color: #444;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .kana {
+    font-size: 1.8rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    user-select: none;
+  }
+
+  .blank {
+    border-bottom: 3px solid #b23b3b;
+    cursor: pointer;
+  }
+
+  #options {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 10px;
+    min-height: 56px;
+  }
+
+  .option {
+    background-color: #ffeaea;
+    border: 2px solid #b23b3b;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: transform .08s ease;
+    min-width: 54px;
+    text-align: center;
+  }
+
+  .option:active { transform: translateY(1px); }
+
+  #message {
+    margin-top: 14px;
+    font-size: 1.05rem;
+    min-height: 1.2rem;
+    color: #333;
+    font-weight: 600;
+  }
+
+  #meaning {
+    margin-top: 8px;
+    font-size: 0.98rem;
+    color: #555;
+    min-height: 1.1rem;
+  }
+
+  #next {
+    margin-top: 16px;
+    background-color: #b23b3b;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 9px 18px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+
+  #progress {
+    margin-bottom: 8px;
+    color: #666;
+    font-size: 0.95rem;
+  }
+
+  @media (max-width:640px){
+    .letter-box { width:54px; height:74px; }
+    .kana { font-size:1.5rem; }
+    .option { font-size:1rem; padding:7px 10px; min-width:46px; }
+  }
+
+  @media (max-width:520px){
+    .letter-box { width:48px; height:64px; }
+    .romaji { font-size:0.6rem; }
+    .kana { font-size:1.4rem; }
+  }
+</style>
+</head>
+<body>
+  <h1>Choose the Missing Kana — Words</h1>
+
+  <div id="game-container">
+    <div id="progress"></div>
+    <div class="word-container" id="word"></div>
+
+    <div id="options" aria-live="polite"></div>
+    <div id="message" role="status"></div>
+    <div id="meaning"></div>
+    <button id="next">Next</button>
+  </div>
+
+<script>
+/*
+  All questions come from the list provided.
+  Each question object:
+   - kana: array of individual kana (each one box)
+   - romaji: same-length array of romaji strings
+   - missingIndices: all indices (every kana blank)
+   - meaning: English meaning shown when completed
+*/
+
+// kanaPool: pool of distractor kana (common hiragana)
+const kanaPool = [
+ "あ","い","う","え","お",
+ "か","き","く","け","こ",
+ "さ","し","す","せ","そ",
+ "た","ち","つ","て","と",
+ "な","に","ぬ","ね","の",
+ "は","ひ","ふ","へ","ほ",
+ "ま","み","む","め","も",
+ "や","ゆ","よ",
+ "ら","り","る","れ","ろ",
+ "わ","を","ん",
+ "が","ぎ","ぐ","げ","ご",
+ "ざ","じ","ず","ぜ","ぞ",
+ "だ","ぢ","づ","で","ど",
+ "ば","び","ぶ","べ","ぼ",
+ "ぱ","ぴ","ぷ","ぺ","ぽ",
+ // a few combos / small kana to increase variety (may not be used often)
+ "ゃ","ゅ","ょ","っ"
+];
+
+const questions = [
+  { kana:["ひ","と"], romaji:["hi","to"], missingIndices:[0,1], meaning:"person" },
+  { kana:["が","く","せ","い"], romaji:["ga","ku","se","i"], missingIndices:[0,1,2,3], meaning:"student" },
+  { kana:["せ","ん","せ","い"], romaji:["se","n","se","i"], missingIndices:[0,1,2,3], meaning:"teacher" },
+  { kana:["え","き"], romaji:["e","ki"], missingIndices:[0,1], meaning:"station" },
+  { kana:["み","ち"], romaji:["mi","chi"], missingIndices:[0,1], meaning:"road" },
+  { kana:["み","せ"], romaji:["mi","se"], missingIndices:[0,1], meaning:"shop" },
+  { kana:["い","え"], romaji:["i","e"], missingIndices:[0,1], meaning:"house" },
+  { kana:["あ","し","た"], romaji:["a","shi","ta"], missingIndices:[0,1,2], meaning:"tomorrow" },
+  { kana:["じ","か","ん"], romaji:["ji","ka","n"], missingIndices:[0,1,2], meaning:"time" },
+  { kana:["と","け","い"], romaji:["to","ke","i"], missingIndices:[0,1,2], meaning:"clock" },
+  { kana:["ふ","く"], romaji:["fu","ku"], missingIndices:[0,1], meaning:"clothes" },
+  { kana:["く","つ"], romaji:["ku","tsu"], missingIndices:[0,1], meaning:"shoes" },
+  { kana:["つ","く","え"], romaji:["tsu","ku","e"], missingIndices:[0,1,2], meaning:"desk" },
+  { kana:["み","ず"], romaji:["mi","zu"], missingIndices:[0,1], meaning:"water" },
+  { kana:["ご","は","ん"], romaji:["go","ha","n"], missingIndices:[0,1,2], meaning:"rice / meal" },
+  { kana:["か","ば","ん"], romaji:["ka","ba","n"], missingIndices:[0,1,2], meaning:"bag" },
+  { kana:["い","す"], romaji:["i","su"], missingIndices:[0,1], meaning:"chair" },
+  { kana:["え","ん","ぴ","つ"], romaji:["e","n","pi","tsu"], missingIndices:[0,1,2,3], meaning:"pencil" },
+  { kana:["ほ","ん"], romaji:["ho","n"], missingIndices:[0,1], meaning:"book" },
+  { kana:["は","な","す"], romaji:["ha","na","su"], missingIndices:[0,1,2], meaning:"to speak" },
+  { kana:["き","く"], romaji:["ki","ku"], missingIndices:[0,1], meaning:"to listen / ask" },
+  { kana:["か","く"], romaji:["ka","ku"], missingIndices:[0,1], meaning:"to write" },
+  { kana:["た","べ","た","い"], romaji:["ta","be","ta","i"], missingIndices:[0,1,2,3], meaning:"want to eat" },
+  { kana:["た","べ","た","く","な","い"], romaji:["ta","be","ta","ku","na","i"], missingIndices:[0,1,2,3,4,5], meaning:"don't want to eat" },
+  { kana:["お","そ","い"], romaji:["o","so","i"], missingIndices:[0,1,2], meaning:"slow / late" },
+  { kana:["す","こ","し"], romaji:["su","ko","shi"], missingIndices:[0,1,2], meaning:"a little" },
+  { kana:["た","く","さ","ん"], romaji:["ta","ku","sa","n"], missingIndices:[0,1,2,3], meaning:"many" },
+  { kana:["ま","だ"], romaji:["ma","da"], missingIndices:[0,1], meaning:"not yet / still" },
+  { kana:["ど","こ"], romaji:["do","ko"], missingIndices:[0,1], meaning:"where" },
+  { kana:["な","に"], romaji:["na","ni"], missingIndices:[0,1], meaning:"what" },
+   { kana:["ぼ","く"], romaji:["bo","ku"], missingIndices:[0,1], meaning:"I (male, rough)" },
+  { kana:["な","ん"], romaji:["na","n"], missingIndices:[0,1], meaning:"what (alt)" },
+  { kana:["は","な"], romaji:["ha","na"], missingIndices:[0,1], meaning:"flower / nose" },
+  { kana:["は","し"], romaji:["ha","shi"], missingIndices:[0,1], meaning:"bridge / chopsticks" },
+  { kana:["へ","い","き","ん"], romaji:["he","i","ki","n"], missingIndices:[0,1,2,3], meaning:"average" },
+  { kana:["ほ","ね"], romaji:["ho","ne"], missingIndices:[0,1], meaning:"bone" },
+  { kana:["は","な","び"], romaji:["ha","na","bi"], missingIndices:[0,1,2], meaning:"firework" },
+  { kana:["は","は"], romaji:["ha","ha"], missingIndices:[0,1], meaning:"(my) mom" },
+  { kana:["は","た","け"], romaji:["ha","ta","ke"], missingIndices:[0,1,2], meaning:"field" },
+  { kana:["ふ","ね"], romaji:["fu","ne"], missingIndices:[0,1], meaning:"boat" },
+  { kana:["ふ","じ","さ","ん"], romaji:["fu","ji","sa","n"], missingIndices:[0,1,2,3], meaning:"Mount Fuji" },
+  { kana:["ふ","か","い"], romaji:["fu","ka","i"], missingIndices:[0,1,2], meaning:"deep" },
+  { kana:["ひ","く","い"], romaji:["hi","ku","i"], missingIndices:[0,1,2], meaning:"low / short" },
+  { kana:["ひ","と","つ"], romaji:["hi","to","tsu"], missingIndices:[0,1,2], meaning:"one (quantity)" },
+  { kana:["し","へ","い"], romaji:["shi","he","i"], missingIndices:[0,1,2], meaning:"banknote" }
+];
+
+// state
+let currentIndex = 0;
+let filledCount = 0;
+
+const wordEl = document.getElementById("word");
+const optionsEl = document.getElementById("options");
+const messageEl = document.getElementById("message");
+const meaningEl = document.getElementById("meaning");
+const nextBtn = document.getElementById("next");
+const progressEl = document.getElementById("progress");
+
+function clearOptions() {
+  optionsEl.innerHTML = "";
+}
+
+function updateProgress() {
+  progressEl.textContent = `Word ${currentIndex+1} / ${questions.length}`;
+}
+
+function renderQuestion() {
+  clearOptions();
+  messageEl.textContent = "";
+  meaningEl.textContent = "";
+  wordEl.innerHTML = "";
+  filledCount = 0;
+  updateProgress();
+
+  const q = questions[currentIndex];
+
+  // build boxes — all kana are blanks
+  q.kana.forEach((ch, i) => {
+    const box = document.createElement("div");
+    box.className = "letter-box";
+
+    const romajiDiv = document.createElement("div");
+    romajiDiv.className = "romaji";
+    romajiDiv.textContent = (q.romaji && q.romaji[i]) ? q.romaji[i] : "\u00A0";
+
+    const kanaDiv = document.createElement("div");
+    kanaDiv.className = "kana blank";
+    kanaDiv.dataset.index = i;      // store index for reference
+    kanaDiv.textContent = "";       // initially empty
+    kanaDiv.addEventListener("click", (e) => {
+      // stop event from bubbling to document click (so options don't immediately clear)
+      e.stopPropagation();
+      if (kanaDiv.textContent.trim() !== "") return; // already filled
+      showOptionsForBlank(kanaDiv, q);
+    });
+
+    box.appendChild(romajiDiv);
+    box.appendChild(kanaDiv);
+    wordEl.appendChild(box);
+  });
+}
+
+function showOptionsForBlank(blankElem, q) {
+  // clear previous message and options
+  messageEl.textContent = "";
+  optionsEl.innerHTML = "";
+
+  const idx = Number(blankElem.dataset.index);
+  const correct = q.kana[idx];
+
+  // prepare options array: 1 correct + 4 distinct wrong from pool
+  const opts = [correct];
+  // try to include some kana from the word as distractors (but not the correct one)
+  const extras = q.kana.filter((k,i)=>i!==idx);
+  for (let ex of extras) {
+    if (opts.length < 5 && !opts.includes(ex)) opts.push(ex);
+  }
+  while (opts.length < 5) {
+    const r = kanaPool[Math.floor(Math.random() * kanaPool.length)];
+    if (!opts.includes(r)) opts.push(r);
+  }
+  // shuffle (Fisher-Yates)
+  for (let i = opts.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [opts[i], opts[j]] = [opts[j], opts[i]];
+  }
+
+  // render buttons
+  opts.forEach(opt => {
+    const btn = document.createElement("button");
+    btn.className = "option";
+    btn.type = "button";
+    btn.textContent = opt;
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      if (blankElem.textContent.trim() !== "") return; // ignore if already filled
+      if (opt === correct) {
+        blankElem.textContent = correct;
+        blankElem.style.color = "#b23b3b";
+        blankElem.style.borderBottom = "3px solid transparent";
+        filledCount++;
+        clearOptions();
+        messageEl.textContent = "✅ Correct!";
+        // If all filled - reveal meaning
+        if (filledCount === q.kana.length) {
+          messageEl.textContent = "🎉 All filled!";
+          meaningEl.textContent = "Meaning: " + q.meaning;
+        }
+      } else {
+        messageElemFlash("❌ Try again!");
+      }
+    });
+    optionsEl.appendChild(btn);
+  });
+}
+
+// small helper to show temporary message when wrong (keeps message until next action)
+function messageElemFlash(text) {
+  messageEl.textContent = text;
+}
+
+// Next button action
+nextBtn.addEventListener("click", () => {
+  currentIndex++;
+  if (currentIndex >= questions.length) {
+    wordEl.innerHTML = "<div style='font-size:1.2rem; padding: 18px;'>🎉 You've completed all words!</div>";
+    optionsEl.innerHTML = "";
+    messageEl.textContent = "";
+    meaningEl.textContent = "";
+    nextBtn.style.display = "none";
+    progressEl.textContent = "Done";
+  } else {
+    renderQuestion();
+  }
+});
+
+// clicking outside clears options (closes the multiple-choice area)
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".option") && !e.target.closest(".blank")) {
+    clearOptions();
+    messageEl.textContent = "";
+  }
+});
+
+// initialize first question
+renderQuestion();
+</script>
+</body>
+</html>
